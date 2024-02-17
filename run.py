@@ -5,47 +5,34 @@ from riix.utils import MatchupDataset
 from riix.models.elo import Elo
 from riix.models.glicko import Glicko
 from riix.metrics import binary_metrics_suite
+from riix.eval import evaluate, train_and_evaluate
 
-def nba():
-    nba_df = pd.read_csv('data/nbaallelo_csv.csv')
-    nba_df['outcome'] = np.where(nba_df['game_result'] == 'w', 1.0, np.where(nba_df['game_result'] == 'l', 0.0, 0.5))
+
+def evaluate_dataset(dataset):
+    elo = Elo(dataset.competitors)
+    elo_metrics = evaluate(elo, dataset)
+    print(elo_metrics)
+
+    glicko = Glicko(dataset.competitors)
+    glicko_metrics = evaluate(glicko, dataset)
+    print(glicko_metrics)
+
+def main():
+    nba_df = pd.read_csv('data/nba/processed.csv')
     nba_dataset = MatchupDataset(
         nba_df,
-        competitor_cols=['team_id', 'opp_id'],
+        competitor_cols=['team_1', 'team_2'],
+        datetime_col='date',
         outcome_col='outcome',
-        datetime_col='date_game',
         rating_period='30D'
     )
-    nba_elo = Elo(competitors=nba_dataset.competitors)
-    nba_elo_probs = nba_elo.fit_dataset(nba_dataset, return_pre_match_probs=True)
-    nba_elo_metrics = binary_metrics_suite(nba_elo_probs, nba_dataset.outcomes)
-    print(nba_elo_metrics)
+    print('evaluating nba')
+    evaluate_dataset(nba_dataset)
 
-    nba_glicko = Glicko(competitors=nba_dataset.competitors)
-    nba_glicko_probs = nba_glicko.fit_dataset(nba_dataset, return_pre_match_probs=True)
-    nba_glicko_metrics = binary_metrics_suite(nba_glicko_probs, nba_dataset.outcomes)
-    print(nba_glicko_metrics)
-
-def chess():
-    df = pd.read_csv('data/chess/all_matchups_processed.csv')
-    chess_dataset = MatchupDataset(
-        df,
-        competitor_cols=['player_1', 'player_2'],
-        outcome_col='outcome',
-        time_step_col='time_step'
-    )
-    chess_elo = Elo(competitors=chess_dataset.competitors)
-    chess_elo_probs = chess_elo.fit_dataset(chess_dataset, return_pre_match_probs=True)
-    chess_elo_metrics = binary_metrics_suite(chess_elo_probs, chess_dataset.outcomes)
-    print(chess_elo_metrics)
-
-    chess_glicko = Glicko(competitors=chess_dataset.competitors)
-    chess_glicko_probs = chess_glicko.fit_dataset(chess_dataset, return_pre_match_probs=True)
-    chess_glicko_metrics = binary_metrics_suite(chess_glicko_probs, chess_dataset.outcomes)
-    print(chess_glicko_metrics)
-
+    chess_dataset = MatchupDataset.load_from_npz('data/chess/processed.npz')
+    print('evaluating chess')
+    evaluate_dataset(chess_dataset)
 
 
 if __name__ == '__main__':
-    # nba()
-    chess()
+    main()
