@@ -27,13 +27,12 @@ def nba():
     print(nba_glicko_metrics)
 
 def chess():
-    df = pd.read_csv('data/chess/primary_training_part1.csv')
-    df['timestamp'] = df['MonthID'].astype(np.float64) * (30 * 24 * 60 * 60)
+    df = pd.read_csv('data/chess/all_matchups_processed.csv')
     chess_dataset = MatchupDataset(
         df,
-        competitor_cols=['WhitePlayer', 'BlackPlayer'],
-        outcome_col='WhiteScore',
-        timestamp_col='timestamp'
+        competitor_cols=['player_1', 'player_2'],
+        outcome_col='outcome',
+        time_step_col='time_step'
     )
     chess_elo = Elo(competitors=chess_dataset.competitors)
     chess_elo_probs = chess_elo.fit_dataset(chess_dataset, return_pre_match_probs=True)
