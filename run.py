@@ -1,5 +1,7 @@
 import random
 import itertools
+import multiprocessing
+from functools import partial
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -10,21 +12,22 @@ from riix.metrics import binary_metrics_suite
 from riix.eval import evaluate, train_and_evaluate
 
 GLICKO_PARAMS_GRID = {
-    'initial_rating_dev': np.linspace(10,100, num=15),
-    'c': np.linspace(10,100, num=15),
+    'initial_rating_dev': np.linspace(1,100, num=10),
+    'c': np.linspace(10,100, num=10),
 }
 
 def hyperparameter_sweep(model_class, dataset, params_grid, seed=10):
+    pool = multiprocessing.Pool(4)
     random.seed(seed)
     keys, values = zip(*params_grid.items())
     params_combs = [dict(zip(keys, v)) for v in itertools.product(*values)]
     random.shuffle(params_combs)
     all_metrics = []
-    for params in params_combs:
-        model = model_class(dataset.competitors, **params)
-        metrics = evaluate(model, dataset)
-        print(f'{params} acc: {metrics["accuracy"]}')
-        all_metrics.append(metrics)
+    models = [model_class(dataset.competitors, **params) for params in params_combs]
+    all_metrics = pool.map(partial(evaluate, dataset=dataset), models)
+    print(all_metrics)
+    # print(f'{params} acc: {metrics["accuracy"]}')
+    # all_metrics.append(metrics)
     return all_metrics
         
 
