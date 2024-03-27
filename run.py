@@ -16,7 +16,11 @@ GLICKO_PARAMS_GRID = {
     'c': np.linspace(10,100, num=20),
 }
 
-def hyperparameter_sweep(model_class, dataset, params_grid, seed=10):
+ELO_PARAMS_GRID = {
+    'k' : np.linspace(1,128, num=50)
+}
+
+def hyperparameter_sweep(model_class, dataset, params_grid, seed=0):
     pool = multiprocessing.Pool(8)
     random.seed(seed)
     keys, values = zip(*params_grid.items())
@@ -25,20 +29,8 @@ def hyperparameter_sweep(model_class, dataset, params_grid, seed=10):
     all_metrics = []
     models = [model_class(dataset.competitors, **params) for params in params_combs]
     all_metrics = pool.map(partial(evaluate, dataset=dataset), models)
-    print(all_metrics)
-    # print(f'{params} acc: {metrics["accuracy"]}')
-    # all_metrics.append(metrics)
-    return all_metrics
+    return all_metrics, params_combs
         
-
-def evaluate_dataset(dataset):
-    elo = Elo(dataset.competitors)
-    elo_metrics = evaluate(elo, dataset)
-    print(elo_metrics)
-
-    glicko = Glicko(dataset.competitors)
-    glicko_metrics = evaluate(glicko, dataset)
-    print(glicko_metrics)
 
 def main():
     nba_df = pd.read_csv('data/nba/processed.csv')
@@ -49,13 +41,16 @@ def main():
         outcome_col='outcome',
         rating_period='7D'
     )
-    # chess_dataset = MatchupDataset.load_from_npz('data/chess/processed.npz')
+    chess_dataset = MatchupDataset.load_from_npz('data/chess/processed.npz')
+    dataset = chess_dataset
 
-    nba_glicko_metrics = hyperparameter_sweep(Glicko, nba_dataset, GLICKO_PARAMS_GRID)
-    x = np.arange(len(nba_glicko_metrics))
-    # y = [metric['accuracy'] for metric in nba_glicko_metrics]
-    y = np.maximum.accumulate([metric['accuracy'] for metric in nba_glicko_metrics])
-    plt.plot(x,y)
+    # glicko_metrics = hyperparameter_sweep(Glicko, dataset, GLICKO_PARAMS_GRID)
+    elo_metrics, params_combs = hyperparameter_sweep(Elo, dataset, ELO_PARAMS_GRID)
+    x = np.arange(len(elo_metrics))
+    x = [params['k'] for params in params_combs]
+    y = [metric['accuracy'] for metric in elo_metrics]
+    # y = np.maximum.accumulate([metric['accuracy'] for metric in elo_metrics])
+    plt.scatter(x,y)
     plt.xlabel('iteration')
     plt.ylabel('accuracy')
     plt.show()
