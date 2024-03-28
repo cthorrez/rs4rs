@@ -50,7 +50,7 @@ def main():
     x = [params['k'] for params in params_combs]
     y = [metric['accuracy'] for metric in elo_metrics]
     # y = np.maximum.accumulate([metric['accuracy'] for metric in elo_metrics])
-    plt.scatter(x,y)
+    plt.scatter(x, y)
     plt.xlabel('iteration')
     plt.ylabel('accuracy')
     plt.show()
