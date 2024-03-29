@@ -7,7 +7,6 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from riix.utils import MatchupDataset, split_matchup_dataset
 from riix.models.elo import Elo
 from riix.models.glicko import Glicko
 from riix.models.trueskill import TrueSkill
@@ -15,6 +14,8 @@ from riix.models.skf import VSKF
 from riix.models.weng_lin_thurstone_mosteller import WengLinThurstoneMosteller
 from riix.metrics import binary_metrics_suite
 from riix.eval import grid_search
+
+from data_utils import load_datasets
 
 
 ELO_PARAM_RANGES = {
@@ -131,22 +132,9 @@ def construct_dataset_from_sweep_results(
 def main(
     file_name
 ):
-    nba_df = pd.read_csv('data/nba/processed.csv')
-    nba_dataset = MatchupDataset(
-        nba_df,
-        competitor_cols=['team_1', 'team_2'],
-        datetime_col='date',
-        outcome_col='outcome',
-        rating_period='7D'
 
-    )
-    dataset = nba_dataset
-    
-    # chess_dataset = MatchupDataset.load_from_npz('data/chess/processed.npz')
-    # dataset = chess_dataset
+    train_dataset, test_dataset = load_datasets('chess', max_rows=50000)
 
-
-    train_dataset, test_dataset = split_matchup_dataset(dataset, 0.2)
 
     num_repetitions = 2
     num_samples = 10
