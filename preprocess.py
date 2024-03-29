@@ -5,7 +5,9 @@ import numpy as np
 def preprocess_chess():
     print('preprocessing chess data')
     dfs = []
-    for file in glob.glob('data/chess/raw/*.csv'):
+    # for file in glob.glob('data/chess/raw/*.csv'): # this is too much data it's killing my computer
+    for file in ['data/chess/raw/primary_training_part1.csv']:
+
         df = pd.read_csv(file)
         if 'primary' in file:
             df['time_step'] = df['MonthID'] - 1
