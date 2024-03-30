@@ -10,13 +10,20 @@ import matplotlib.pyplot as plt
 from riix.models.elo import Elo
 from riix.models.glicko import Glicko
 from riix.models.trueskill import TrueSkill
-from riix.models.skf import VSKF
 from riix.models.weng_lin_thurstone_mosteller import WengLinThurstoneMosteller
 from riix.metrics import binary_metrics_suite
-from riix.eval import grid_search
+from riix.eval import grid_search_train_test, grid_search
 
 from data_utils import load_datasets
 
+CB_color_cycle = ['#377eb8', '#ff7f00', '#4daf4a',
+                  '#f781bf', '#a65628', '#984ea3',
+                  '#999999', '#e41a1c', '#dede00']
+plt.rcParams['axes.prop_cycle'] = plt.cycler(color=CB_color_cycle)
+np.seterr(divide='ignore')
+import warnings
+# Suppress overflow warnings globally
+warnings.filterwarnings("ignore", category=RuntimeWarning)
 
 ELO_PARAM_RANGES = {
     'k' : (0.32, 320)
@@ -31,13 +38,6 @@ TRUESKILL_PARAM_RANGES = {
     'initial_sigma': (0.833, 83.33),
     'beta':  (0.4166, 41.66),
     'tau': (0.00833, 0.833)
-}
-
-VSKF_PARAM_RANGES = {
-    'v_0' : (0.1, 10.0),
-    'beta': (0.0, 1.0),
-    's' :  (0.1, 10.0),
-    'epsilon': (0.0002, 0.02),
 }
 
 WL_TM_PARAM_RANGES = {
@@ -59,10 +59,6 @@ MODEL_CONFIGS = {
     'TrueSkill' : {
         'class' : TrueSkill,
         'param_ranges' : TRUESKILL_PARAM_RANGES,
-    },
-    'V-SKF' : {
-        'class' : VSKF,
-        'param_ranges' : VSKF_PARAM_RANGES,
     },
     'Weng-Lin Thurstone-Mosteller' : {
         'class' : WengLinThurstoneMosteller,
@@ -107,7 +103,7 @@ def run_grid_searches(
             num_samples=num_samples,
             seed=seed
         )
-        _, _, all_metrics = grid_search(
+        best_params, _, all_metrics = grid_search_train_test(
             rating_system_class=rating_system_class,
             inputs=params,
             train_dataset=train_dataset,
@@ -115,34 +111,54 @@ def run_grid_searches(
             metric='accuracy',
             minimize_metric=False,
             return_all_metrics=True,
-            num_processes=16
+            num_processes=12
         )
+        print('best params:')
+        print(best_params)
         accs = np.maximum.accumulate([metric['accuracy'] for metric in all_metrics])
         results[:,seed] = accs
-    return results
+    return best_params, results
 
-
-def construct_dataset_from_sweep_results(
-    sweep_results,
-    num_timesteps, num
+def run_grid_search(
+    rating_system_class,
+    param_ranges,
+    dataset,
+    num_samples=1000,
+    seed=0
 ):
-    pass
+    params = create_uniform_grid(
+        param_ranges=param_ranges,
+        num_samples=num_samples,
+        seed=seed
+    )
+    best_params, _, all_metrics = grid_search(
+        rating_system_class=rating_system_class,
+        inputs=params,
+        dataset=dataset,
+        metric='log_loss',
+        minimize_metric=True,
+        return_all_metrics=True,
+        num_processes=12
+    )
+    print('best params:')
+    print(best_params)
 
+    return best_params
 
 def main(
-    file_name
+    game,
+    max_rows=None
 ):
 
-    train_dataset, test_dataset = load_datasets('chess', max_rows=50000)
-
-
-    num_repetitions = 2
-    num_samples = 10
+    train_dataset, test_dataset = load_datasets(game, max_rows=max_rows)
+    num_repetitions = 5
+    num_samples = 100
 
     x = np.arange(num_samples)
     all_results = {}
     for model in MODEL_CONFIGS.keys():
-        model_results = run_grid_searches(
+        print(f'running sweep on {model}')
+        _, model_results = run_grid_searches(
             rating_system_class=MODEL_CONFIGS[model]['class'],
             param_ranges=MODEL_CONFIGS[model]['param_ranges'],
             train_dataset=train_dataset,
@@ -151,15 +167,20 @@ def main(
             num_repetitions=num_repetitions,
         )
         all_results[model] = model_results
-        plt.plot(x, model_results.mean(axis=1), label=model)
+        plt.plot(x, model_results.mean(axis=1), label=model, lw=2.5)
 
+    plt.title(f'{game}')
+    plt.xlabel('hyperparameter sweep iteration')
+    plt.ylabel('best accuracy')
     plt.legend()
+    plt.savefig(f'figs/{game}_{num_samples}_{num_repetitions}.png')
     plt.show()
-    np.savez(file=f'data/{file_name}_sweep_results.npz', **all_results)
+    np.savez(file=f'data/{game}_{num_samples}_{num_repetitions}_sweep_results.npz', **all_results)
     
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('-f', '--file_name', type=str, required=False, default=datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
+    parser.add_argument('-g', '--game', type=str)
+    parser.add_argument('-mr', '--max_rows', type=int, required=False)
     args = vars(parser.parse_args())
     main(**args)
